@@ -2,13 +2,45 @@ import { getStore } from "@netlify/blobs";
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 
+const HELP_TEXT = [
+  "Привет! Я сохраняю фото в альбом «Воспоминания» 🕊",
+  "",
+  "Как пользоваться:",
+  "• Просто пришли фото — сохранится с сегодняшней датой.",
+  "• Пришли фото с подписью, начинающейся с даты, например:",
+  "  21.07.2026 гуляли в парке",
+  "  или",
+  "  2026-07-21 гуляли в парке",
+  "  — сохранится именно эта дата, а остальной текст станет подписью.",
+  "",
+  "Команды:",
+  "/help — показать эту инструкцию ещё раз"
+].join("\n");
+
+async function sendMessage(chatId, text) {
+  await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ chat_id: chatId, text })
+  });
+}
+
 export default async (req) => {
   if (req.method !== "POST") return new Response("OK");
 
   const update = await req.json();
   const msg = update.message;
 
-  if (!msg || !msg.photo) {
+  if (!msg) return new Response("OK");
+
+  // Text messages: /start, /help, or anything else that isn't a photo
+  if (!msg.photo) {
+    const text = (msg.text || "").trim().toLowerCase();
+    if (text === "/start" || text === "/help") {
+      await sendMessage(msg.chat.id, HELP_TEXT);
+    } else {
+      await sendMessage(msg.chat.id, "Пришли мне фото, чтобы сохранить его в альбом. Команда /help покажет подробную инструкцию.");
+    }
     return new Response("OK");
   }
 
@@ -43,14 +75,7 @@ export default async (req) => {
   meta.push({ id, date, caption });
   await s.set("meta.json", JSON.stringify(meta));
 
-  await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      chat_id: msg.chat.id,
-      text: `Сохранено ✅ дата: ${date}${caption ? "\nподпись: " + caption : ""}`
-    })
-  });
+  await sendMessage(msg.chat.id, `Сохранено ✅ дата: ${date}${caption ? "\nподпись: " + caption : ""}`);
 
   return new Response("OK");
 };
