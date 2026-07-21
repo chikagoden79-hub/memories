@@ -1,0 +1,8 @@
+{
+  "name": "memories-site",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@netlify/blobs": "^7.3.0"
+  }
+}

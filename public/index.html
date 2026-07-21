@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Воспоминания</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;1,600&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #f4ecd8;
+    --board: #eadfc4;
+    --card: #fffdf7;
+    --ink: #2e2013;
+    --ink-soft: #6b5a45;
+    --gold: #c98f1f;
+    --wine: #7a2f3b;
+    --wine-dark: #5c2029;
+    --shadow: 0 10px 24px rgba(46,32,19,0.18);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(circle at 20% 10%, rgba(201,143,31,0.10), transparent 40%),
+      radial-gradient(circle at 80% 90%, rgba(122,47,59,0.08), transparent 45%),
+      var(--bg);
+    font-family:'Work Sans', sans-serif;
+    color:var(--ink);
+    min-height:100vh;
+  }
+  header{ text-align:center; padding:48px 20px 28px; }
+  header h1{
+    font-family:'Playfair Display', serif;
+    font-weight:700;
+    font-size:clamp(2rem, 5vw, 3rem);
+    margin:0;
+    color:var(--wine-dark);
+  }
+  header p{ margin:8px 0 0; color:var(--ink-soft); font-style:italic; font-family:'Playfair Display', serif; }
+  nav{ display:flex; justify-content:center; gap:8px; padding:0 16px 32px; flex-wrap:wrap; }
+  nav button{
+    font-size:0.92rem; font-weight:600; letter-spacing:0.03em; text-transform:uppercase;
+    padding:10px 20px; border-radius:999px; border:1.5px solid var(--gold);
+    background:transparent; color:var(--wine-dark); cursor:pointer; transition: all .2s ease;
+  }
+  nav button.active{ background:var(--gold); color:#fff; box-shadow: 0 4px 10px rgba(201,143,31,0.35); }
+  main{ max-width:1100px; margin:0 auto; padding:0 20px 80px; }
+  section.tab{ display:none; animation: fadeIn .4s ease; }
+  section.tab.active{ display:block; }
+  @keyframes fadeIn{ from{opacity:0; transform:translateY(8px);} to{opacity:1; transform:translateY(0);} }
+
+  .board{ background: var(--board); border-radius:18px; padding:32px; box-shadow: inset 0 2px 10px rgba(46,32,19,0.10); min-height:120px; }
+  .board-empty{ text-align:center; color:var(--ink-soft); font-family:'Playfair Display', serif; font-style:italic; font-size:1.15rem; padding:60px 20px; }
+  .grid{ columns: 3 260px; column-gap:22px; }
+  @media(max-width:640px){ .grid{ columns: 1 260px; } }
+
+  .polaroid{
+    display:inline-block; width:100%; break-inside:avoid; margin:0 0 22px;
+    background:var(--card); padding:14px 14px 18px; border-radius:4px;
+    box-shadow:var(--shadow); cursor:pointer; transition: transform .25s ease, box-shadow .25s ease; position:relative;
+  }
+  .polaroid:nth-child(3n+1){ transform: rotate(-2deg); }
+  .polaroid:nth-child(3n+2){ transform: rotate(1.5deg); }
+  .polaroid:nth-child(3n){ transform: rotate(-1deg); }
+  .polaroid:hover{ transform: scale(1.03) rotate(0deg); box-shadow: 0 16px 30px rgba(46,32,19,0.28); z-index:2; }
+  .polaroid img{ width:100%; display:block; border-radius:2px; background:#e4d9c2; aspect-ratio: 1/1; object-fit:cover; }
+  .polaroid .tape{ position:absolute; top:-10px; left:50%; transform:translateX(-50%) rotate(-3deg); width:64px; height:22px; background: rgba(201,143,31,0.55); border:1px solid rgba(201,143,31,0.7); }
+  .polaroid .date{ font-family:'Playfair Display', serif; font-weight:600; font-size:0.85rem; color:var(--wine); margin-top:10px; }
+  .polaroid .caption{ font-size:0.88rem; color:var(--ink-soft); margin-top:4px; line-height:1.35; }
+
+  .form-card{ max-width:520px; margin:0 auto; background:var(--card); border-radius:16px; padding:32px; box-shadow:var(--shadow); }
+  .form-card h2{ font-family:'Playfair Display', serif; color:var(--wine-dark); margin-top:0; }
+  label{ display:block; font-weight:600; font-size:0.85rem; text-transform:uppercase; letter-spacing:0.03em; color:var(--ink-soft); margin:18px 0 6px; }
+  input[type=file], input[type=date], textarea{
+    width:100%; padding:10px 12px; border-radius:8px; border:1.5px solid #dccba0;
+    background:#fffefb; font-size:0.95rem; color:var(--ink);
+  }
+  textarea{ resize:vertical; min-height:70px; }
+  .date-row{ display:flex; gap:8px; margin-top:8px; flex-wrap:wrap; }
+  .chip{ font-size:0.78rem; padding:6px 12px; border-radius:999px; border:1px solid var(--gold); background:#fff; color:var(--wine-dark); cursor:pointer; }
+  .chip:hover{ background:#fbeed0; }
+  #preview{ margin-top:14px; max-width:100%; max-height:220px; border-radius:8px; display:none; }
+  .submit-btn{
+    margin-top:24px; width:100%; padding:13px; border:none; border-radius:10px;
+    background:var(--wine-dark); color:#fff; font-weight:600; font-size:1rem; cursor:pointer; transition: background .2s;
+  }
+  .submit-btn:hover{ background:var(--wine); }
+  .submit-btn:disabled{ opacity:0.6; cursor:default; }
+  .form-note{ font-size:0.8rem; color:var(--ink-soft); margin-top:10px; }
+
+  .random-wrap{ text-align:center; padding:20px 0; }
+  .random-card{ max-width:420px; margin:0 auto; background:var(--card); border-radius:6px; padding:16px 16px 22px; box-shadow:var(--shadow); }
+  .random-card img{ width:100%; border-radius:3px; aspect-ratio: 1/1; object-fit:cover; background:#e4d9c2; }
+  .random-card .date{ font-family:'Playfair Display', serif; color:var(--wine); font-weight:600; margin-top:12px; }
+  .random-card .caption{ color:var(--ink-soft); margin-top:6px; }
+  .random-actions{ margin-top:22px; display:flex; gap:10px; justify-content:center; flex-wrap:wrap; }
+  .btn{ padding:11px 20px; border-radius:999px; border:1.5px solid var(--gold); background:transparent; color:var(--wine-dark); font-weight:600; cursor:pointer; }
+  .btn.primary{ background:var(--gold); color:#fff; border-color:var(--gold); }
+
+  .modal-bg{ display:none; position:fixed; inset:0; background:rgba(46,32,19,0.6); align-items:center; justify-content:center; padding:24px; z-index:50; }
+  .modal-bg.open{ display:flex; }
+  .modal{ background:var(--card); border-radius:10px; max-width:520px; width:100%; max-height:90vh; overflow:auto; padding:20px 20px 26px; position:relative; }
+  .modal img{ width:100%; border-radius:4px; display:block; }
+  .modal .date{ font-family:'Playfair Display', serif; color:var(--wine); font-weight:600; margin-top:14px; }
+  .modal .caption{ margin-top:6px; color:var(--ink-soft); line-height:1.4; }
+  .modal-close{ position:absolute; top:10px; right:12px; background:none; border:none; font-size:1.4rem; cursor:pointer; color:var(--ink-soft); }
+  .modal-delete{ margin-top:18px; font-size:0.8rem; color:var(--wine); background:none; border:1px solid var(--wine); padding:7px 14px; border-radius:999px; cursor:pointer; }
+  .modal-delete:hover{ background:var(--wine); color:#fff; }
+
+  footer{ text-align:center; padding:20px; font-size:0.78rem; color:var(--ink-soft); }
+  .loading{ text-align:center; color:var(--ink-soft); font-style:italic; padding:30px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Воспоминания</h1>
+  <p>Общий альбом — доступен с любого устройства</p>
+</header>
+
+<nav>
+  <button class="tab-btn active" data-tab="gallery">Галерея</button>
+  <button class="tab-btn" data-tab="add">Добавить</button>
+  <button class="tab-btn" data-tab="random">Случайное воспоминание</button>
+</nav>
+
+<main>
+  <section id="gallery" class="tab active">
+    <div class="board">
+      <div id="grid" class="grid"></div>
+      <div id="empty" class="board-empty" style="display:none;">Пока здесь пусто. Загрузи первое воспоминание во вкладке «Добавить» 🕊</div>
+      <div id="loading" class="loading">Загружаю воспоминания…</div>
+    </div>
+  </section>
+
+  <section id="add" class="tab">
+    <div class="form-card">
+      <h2>Новое воспоминание</h2>
+
+      <label for="photoInput">Фото</label>
+      <input type="file" id="photoInput" accept="image/*">
+      <img id="preview" alt="превью">
+
+      <label for="dateInput">Дата</label>
+      <input type="date" id="dateInput">
+      <div class="date-row">
+        <span class="chip" id="btnTodayLocal">Сегодня (по времени телефона)</span>
+        <span class="chip" id="btnTodayMsk">Сегодня (МСК)</span>
+      </div>
+
+      <label for="captionInput">Подпись</label>
+      <textarea id="captionInput" placeholder="Пара слов об этом моменте..."></textarea>
+
+      <button class="submit-btn" id="saveBtn">Сохранить воспоминание</button>
+      <p class="form-note">Фото сохраняется на сервере и видно с любого устройства.</p>
+    </div>
+  </section>
+
+  <section id="random" class="tab">
+    <div class="random-wrap">
+      <div id="randomCard"></div>
+      <div class="random-actions">
+        <button class="btn primary" id="randomAgain">Ещё одно воспоминание</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div class="modal-bg" id="modalBg">
+  <div class="modal">
+    <button class="modal-close" id="modalClose">✕</button>
+    <div id="modalContent"></div>
+  </div>
+</div>
+
+<footer>Твои воспоминания, твой альбом.</footer>
+
+<script>
+const API = '/api/memories';
+let memories = [];
+
+// ---- tabs ----
+document.querySelectorAll('.tab-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.tab').forEach(s=>s.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(btn.dataset.tab).classList.add('active');
+    if(btn.dataset.tab === 'random') showRandom();
+  });
+});
+
+// ---- date helpers ----
+function localDateStr(){
+  const now = new Date();
+  const off = now.getTimezoneOffset();
+  const local = new Date(now.getTime() - off*60000);
+  return local.toISOString().slice(0,10);
+}
+function mskDateStr(){
+  const now = new Date();
+  const utcMs = now.getTime() + now.getTimezoneOffset()*60000;
+  const msk = new Date(utcMs + 3*3600000);
+  return msk.toISOString().slice(0,10);
+}
+document.getElementById('btnTodayLocal').addEventListener('click', ()=>{
+  document.getElementById('dateInput').value = localDateStr();
+});
+document.getElementById('btnTodayMsk').addEventListener('click', ()=>{
+  document.getElementById('dateInput').value = mskDateStr();
+});
+
+function formatDateRu(dateStr){
+  const months = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
+  const [y,m,d] = dateStr.split('-').map(Number);
+  return `${d} ${months[m-1]} ${y}`;
+}
+function escapeHtml(str){
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+// ---- load from server ----
+async function loadMemories(){
+  document.getElementById('loading').style.display = 'block';
+  try{
+    const res = await fetch(API);
+    memories = await res.json();
+  }catch(e){
+    memories = [];
+  }
+  document.getElementById('loading').style.display = 'none';
+  renderGallery();
+}
+
+// ---- image handling for upload ----
+let pendingDataUrl = null;
+document.getElementById('photoInput').addEventListener('change', (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ()=>{
+    const img = new Image();
+    img.onload = ()=>{
+      const maxDim = 1400;
+      let {width, height} = img;
+      if(width > maxDim || height > maxDim){
+        const scale = maxDim / Math.max(width, height);
+        width = Math.round(width*scale);
+        height = Math.round(height*scale);
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width; canvas.height = height;
+      canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+      pendingDataUrl = canvas.toDataURL('image/jpeg', 0.82);
+      const preview = document.getElementById('preview');
+      preview.src = pendingDataUrl;
+      preview.style.display = 'block';
+    };
+    img.src = reader.result;
+  };
+  reader.readAsDataURL(file);
+});
+
+document.getElementById('saveBtn').addEventListener('click', async ()=>{
+  const date = document.getElementById('dateInput').value || localDateStr();
+  const caption = document.getElementById('captionInput').value.trim();
+  if(!pendingDataUrl){
+    alert('Сначала выбери фото.');
+    return;
+  }
+  const btn = document.getElementById('saveBtn');
+  btn.disabled = true;
+  btn.textContent = 'Сохраняю…';
+
+  const base64 = pendingDataUrl.split(',')[1];
+  try{
+    await fetch(API, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ date, caption, imageBase64: base64, mimeType: 'image/jpeg' })
+    });
+  }catch(e){
+    alert('Не получилось сохранить. Проверь подключение и попробуй снова.');
+    btn.disabled = false;
+    btn.textContent = 'Сохранить воспоминание';
+    return;
+  }
+
+  pendingDataUrl = null;
+  document.getElementById('photoInput').value = '';
+  document.getElementById('captionInput').value = '';
+  document.getElementById('preview').style.display = 'none';
+  btn.disabled = false;
+  btn.textContent = 'Сохранить воспоминание';
+
+  await loadMemories();
+  document.querySelector('.tab-btn[data-tab="gallery"]').click();
+});
+
+// ---- gallery ----
+function renderGallery(){
+  const grid = document.getElementById('grid');
+  const empty = document.getElementById('empty');
+  grid.innerHTML = '';
+  if(memories.length === 0){
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+  const sorted = [...memories].sort((a,b)=> b.date.localeCompare(a.date));
+  sorted.forEach(m=>{
+    const card = document.createElement('div');
+    card.className = 'polaroid';
+    card.innerHTML = `
+      <div class="tape"></div>
+      <img src="/api/image?id=${m.id}" alt="воспоминание" loading="lazy">
+      <div class="date">${formatDateRu(m.date)}</div>
+      <div class="caption">${escapeHtml(m.caption || '')}</div>
+    `;
+    card.addEventListener('click', ()=> openModal(m.id));
+    grid.appendChild(card);
+  });
+}
+
+// ---- modal ----
+function openModal(id){
+  const m = memories.find(x=>x.id===id);
+  if(!m) return;
+  document.getElementById('modalContent').innerHTML = `
+    <img src="/api/image?id=${m.id}" alt="воспоминание">
+    <div class="date">${formatDateRu(m.date)}</div>
+    <div class="caption">${escapeHtml(m.caption || '')}</div>
+    <button class="modal-delete" id="deleteBtn">Удалить это воспоминание</button>
+  `;
+  document.getElementById('deleteBtn').addEventListener('click', async ()=>{
+    if(confirm('Удалить это воспоминание насовсем?')){
+      await fetch(API, {
+        method: 'DELETE',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ id })
+      });
+      closeModal();
+      await loadMemories();
+    }
+  });
+  document.getElementById('modalBg').classList.add('open');
+}
+function closeModal(){ document.getElementById('modalBg').classList.remove('open'); }
+document.getElementById('modalClose').addEventListener('click', closeModal);
+document.getElementById('modalBg').addEventListener('click', (e)=>{
+  if(e.target.id === 'modalBg') closeModal();
+});
+
+// ---- random tab ----
+function showRandom(){
+  const wrap = document.getElementById('randomCard');
+  if(memories.length === 0){
+    wrap.innerHTML = `<p style="font-family:'Playfair Display', serif; font-style:italic; color:var(--ink-soft);">Пока нет ни одного воспоминания — добавь первое!</p>`;
+    return;
+  }
+  const m = memories[Math.floor(Math.random()*memories.length)];
+  wrap.innerHTML = `
+    <div class="random-card">
+      <img src="/api/image?id=${m.id}" alt="воспоминание">
+      <div class="date">${formatDateRu(m.date)}</div>
+      <div class="caption">${escapeHtml(m.caption || '')}</div>
+    </div>
+  `;
+}
+document.getElementById('randomAgain').addEventListener('click', showRandom);
+
+// ---- init ----
+document.getElementById('dateInput').value = localDateStr();
+loadMemories();
+</script>
+</body>
+</html>
