@@ -52,6 +52,30 @@
 
   .board{ background: var(--board); border-radius:18px; padding:32px; box-shadow: inset 0 2px 10px rgba(46,32,19,0.10); min-height:120px; }
   .board-empty{ text-align:center; color:var(--ink-soft); font-family:'Playfair Display', serif; font-style:italic; font-size:1.15rem; padding:60px 20px; }
+
+  .gallery-filters{
+    display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+    margin-bottom:18px;
+  }
+  .gallery-filters select{
+    padding:9px 14px;
+    border-radius:999px;
+    border:1.5px solid var(--gold);
+    background:#fff;
+    color:var(--wine-dark);
+    font-size:0.85rem;
+    font-weight:600;
+    cursor:pointer;
+  }
+  #emojiFilterChip{
+    background:var(--wine-dark);
+    color:#fff;
+    border-color:var(--wine-dark);
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+  }
+  #emojiFilterChip:hover{ background:var(--wine); }
   .grid{ columns: 3 260px; column-gap:22px; }
   @media(max-width:640px){ .grid{ columns: 1 260px; } }
 
@@ -174,6 +198,8 @@
     font-size:1.05rem;
   }
   .emoji-row:last-child{ border-bottom:none; }
+  .emoji-row-clickable{ cursor:pointer; transition: background .15s; border-radius:6px; }
+  .emoji-row-clickable:hover{ background:#fbeed0; }
   .emoji-rank{ color:var(--ink-soft); font-size:0.8rem; margin-right:8px; }
   .emoji-count{ color:var(--ink-soft); font-size:0.9rem; }
 
@@ -221,6 +247,16 @@
 
 <main>
   <section id="gallery" class="tab active">
+    <div class="gallery-filters">
+      <select id="sortSelect">
+        <option value="desc">Сначала новые</option>
+        <option value="asc">Сначала старые</option>
+      </select>
+      <select id="monthSelect">
+        <option value="all">Все месяцы</option>
+      </select>
+      <span class="chip" id="emojiFilterChip" style="display:none;"></span>
+    </div>
     <div class="board">
       <div id="grid" class="grid"></div>
       <div id="empty" class="board-empty" style="display:none;">Пока здесь пусто. Загрузи первое воспоминание во вкладке «Добавить» 🕊</div>
@@ -456,17 +492,68 @@ document.getElementById('saveBtn').addEventListener('click', async ()=>{
   }
 });
 
+// ---- gallery filters state ----
+let gallerySort = 'desc';
+let filterMonth = 'all';
+let filterEmoji = null;
+
+function populateMonthFilter(){
+  const select = document.getElementById('monthSelect');
+  const current = select.value;
+  const months = [...new Set(memories.map(m=>m.date.slice(0,7)))].sort();
+  select.innerHTML = '<option value="all">Все месяцы</option>' +
+    months.map(ym=>`<option value="${ym}">${formatMonthRu(ym)}</option>`).join('');
+  if(months.includes(current)) select.value = current;
+}
+
+function setEmojiFilter(emoji){
+  filterEmoji = emoji;
+  const chip = document.getElementById('emojiFilterChip');
+  if(emoji){
+    chip.textContent = `Только с ${emoji} ✕`;
+    chip.style.display = 'inline-flex';
+  }else{
+    chip.style.display = 'none';
+  }
+  renderGallery();
+}
+
+document.getElementById('sortSelect').addEventListener('change', (e)=>{
+  gallerySort = e.target.value;
+  renderGallery();
+});
+document.getElementById('monthSelect').addEventListener('change', (e)=>{
+  filterMonth = e.target.value;
+  renderGallery();
+});
+document.getElementById('emojiFilterChip').addEventListener('click', ()=> setEmojiFilter(null));
+
 // ---- gallery ----
 function renderGallery(){
   const grid = document.getElementById('grid');
   const empty = document.getElementById('empty');
   grid.innerHTML = '';
-  if(memories.length === 0){
+
+  populateMonthFilter();
+
+  let filtered = [...memories];
+  if(filterMonth !== 'all'){
+    filtered = filtered.filter(m => m.date.startsWith(filterMonth));
+  }
+  if(filterEmoji){
+    filtered = filtered.filter(m => extractEmojis(m.caption).includes(filterEmoji));
+  }
+
+  if(filtered.length === 0){
     empty.style.display = 'block';
+    empty.textContent = memories.length === 0
+      ? 'Пока здесь пусто. Загрузи первое воспоминание во вкладке «Добавить» 🕊'
+      : 'Ничего не найдено с текущими фильтрами.';
     return;
   }
   empty.style.display = 'none';
-  const sorted = [...memories].sort((a,b)=> b.date.localeCompare(a.date));
+
+  const sorted = filtered.sort((a,b)=> gallerySort === 'asc' ? a.date.localeCompare(b.date) : b.date.localeCompare(a.date));
   sorted.forEach(m=>{
     const card = document.createElement('div');
     card.className = 'polaroid';
@@ -553,14 +640,6 @@ function formatMonthRu(ym){
   return `${RU_MONTHS_NOM[m-1]} ${y}`;
 }
 
-const STOPWORDS = new Set(['и','в','на','с','по','а','но','что','это','как','для','от','до','за','из','у','же','ли','бы','не','да','то','там','тут','его','ее','её','их','был','было','была','были','я','ты','он','она','мы','вы','они','к','о','об','при','все','всё','уже','ещё','только','очень','просто','так','вот','этот','эта','эти','мой','моя','мое','моё','твой','твоя','твое','твоё','наш','наша','наше','ваш','ваша','ваше','когда','где','кто','чем','чтобы','если','или','него','нее','неё','них','нам','вам','им','мне','тебе','ему','ей','нас','вас']);
-
-function extractWords(text){
-  if(!text) return [];
-  const matches = text.toLowerCase().match(/[a-zа-яё]+/gi) || [];
-  return matches.filter(w => w.length >= 3 && !STOPWORDS.has(w));
-}
-
 function computeStats(){
   if(memories.length === 0) return null;
 
@@ -591,12 +670,10 @@ function computeStats(){
   }
 
   const emojiCounts = {};
-  const wordCounts = {};
   let withCaption = 0;
   let longestCaptionMemory = null;
   memories.forEach(m=>{
     extractEmojis(m.caption).forEach(e=>{ emojiCounts[e] = (emojiCounts[e]||0)+1; });
-    extractWords(m.caption).forEach(w=>{ wordCounts[w] = (wordCounts[w]||0)+1; });
     if(m.caption && m.caption.trim().length > 0){
       withCaption++;
       if(!longestCaptionMemory || m.caption.trim().length > longestCaptionMemory.caption.trim().length){
@@ -605,7 +682,6 @@ function computeStats(){
     }
   });
   const topEmojis = Object.entries(emojiCounts).sort((a,b)=>b[1]-a[1]).slice(0,10);
-  const topWords = Object.entries(wordCounts).sort((a,b)=>b[1]-a[1]).slice(0,10);
 
   const byYear = {};
   memories.forEach(m=>{ const y = m.date.slice(0,4); byYear[y] = (byYear[y]||0)+1; });
@@ -618,9 +694,9 @@ function computeStats(){
   let milestone = null;
   if(reached > 0){
     const m = byUploadOrder[reached - 1];
-    milestone = { count: reached, date: m.date, caption: m.caption, remaining: (reached + milestoneStep) - total };
+    milestone = { count: reached, date: m.date };
   }else{
-    milestone = { count: 0, remaining: milestoneStep - total };
+    milestone = { count: 0 };
   }
 
   return {
@@ -631,7 +707,6 @@ function computeStats(){
     streak: { length: bestStreak, start: bestStart, end: bestEnd },
     longestGap,
     topEmojis,
-    topWords,
     captionRatio: { withCaption, total, percent: Math.round((withCaption/total)*100) },
     longestCaption: longestCaptionMemory,
     yearBreakdown,
@@ -652,21 +727,12 @@ function renderStats(){
 
   const emojiHtml = stats.topEmojis.length
     ? stats.topEmojis.map((e,i)=>`
-        <div class="emoji-row">
+        <div class="emoji-row emoji-row-clickable" data-emoji="${escapeHtml(e[0])}">
           <span><span class="emoji-rank">${i+1}.</span>${e[0]}</span>
           <span class="emoji-count">${e[1]}</span>
         </div>
       `).join('')
     : `<p style="color:var(--ink-soft); font-style:italic; padding:14px 0;">Пока ни один смайлик не встречался в подписях.</p>`;
-
-  const wordsHtml = stats.topWords.length
-    ? stats.topWords.map((w,i)=>`
-        <div class="emoji-row">
-          <span><span class="emoji-rank">${i+1}.</span>${escapeHtml(w[0])}</span>
-          <span class="emoji-count">${w[1]}</span>
-        </div>
-      `).join('')
-    : `<p style="color:var(--ink-soft); font-style:italic; padding:14px 0;">Пока маловато текста в подписях для топа слов.</p>`;
 
   const yearHtml = stats.yearBreakdown.map(([year, count])=>{
     const max = Math.max(...stats.yearBreakdown.map(y=>y[1]));
@@ -681,8 +747,8 @@ function renderStats(){
   }).join('');
 
   const milestoneHtml = stats.milestone.count > 0
-    ? `<div class="milestone-banner">🎉 ${stats.milestone.count}-е воспоминание было добавлено ${formatDateRu(stats.milestone.date)}${stats.milestone.caption ? ' — «' + escapeHtml(stats.milestone.caption) + '»' : ''}. До следующего юбилея осталось ${stats.milestone.remaining} фото.</div>`
-    : `<div class="milestone-banner">До первого юбилея (50 воспоминаний) осталось ${stats.milestone.remaining} фото.</div>`;
+    ? `<div class="milestone-banner">🎉 ${stats.milestone.count}-е воспоминание было добавлено ${formatDateRu(stats.milestone.date)}.</div>`
+    : '';
 
   const longestCaptionHtml = stats.longestCaption
     ? `<div class="callout-card"><div class="stats-subtitle" style="margin-bottom:8px;">Самая длинная подпись</div><p style="color:var(--ink); line-height:1.5;">«${escapeHtml(stats.longestCaption.caption.trim())}»</p><p style="color:var(--ink-soft); font-size:0.85rem; margin-top:6px;">${formatDateRu(stats.longestCaption.date)}</p></div>`
@@ -707,11 +773,16 @@ function renderStats(){
     <div class="emoji-list year-list">${yearHtml}</div>
 
     <h2 class="stats-subtitle">Топ-10 смайликов в подписях</h2>
+    <p style="color:var(--ink-soft); font-size:0.82rem; margin:-6px 0 12px;">Нажми на смайлик, чтобы посмотреть все фото с ним в галерее</p>
     <div class="emoji-list">${emojiHtml}</div>
-
-    <h2 class="stats-subtitle">Топ-10 слов в подписях</h2>
-    <div class="emoji-list">${wordsHtml}</div>
   `;
+
+  wrap.querySelectorAll('.emoji-row-clickable').forEach(row=>{
+    row.addEventListener('click', ()=>{
+      setEmojiFilter(row.dataset.emoji);
+      document.querySelector('.tab-btn[data-tab="gallery"]').click();
+    });
+  });
 }
 
 // ---- init ----
