@@ -2,7 +2,19 @@ import { getStore } from "@netlify/blobs";
 
 const store = () => getStore("memories");
 
+function checkPin(req) {
+  const expected = process.env.SITE_PIN;
+  if (!expected) return true; // no PIN configured — leave open
+  const url = new URL(req.url);
+  const provided = req.headers.get("x-site-pin") || url.searchParams.get("pin");
+  return provided === expected;
+}
+
 export default async (req) => {
+  if (!checkPin(req)) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
+  }
+
   const s = store();
 
   if (req.method === "GET") {
@@ -38,17 +50,20 @@ export default async (req) => {
     const body = await req.json();
     const { date, caption, imageBase64, mimeType } = body;
     if (!imageBase64) {
-      return new Response(JSON.stringify({ error: "Missing image" }), { status: 400 });
+      return new Response(JSON.stringify({ error: "Missing media" }), { status: 400 });
     }
 
     const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
     const bytes = Buffer.from(imageBase64, "base64");
-    await s.set(`img:${id}`, bytes, { metadata: { mimeType: mimeType || "image/jpeg" } });
+    const finalMimeType = mimeType || "image/jpeg";
+    const type = finalMimeType.startsWith("video/") ? "video" : "photo";
+    await s.set(`img:${id}`, bytes, { metadata: { mimeType: finalMimeType } });
 
     const record = {
       id,
       date: date || new Date().toISOString().slice(0, 10),
-      caption: caption || ""
+      caption: caption || "",
+      type
     };
     await s.set(`meta:${id}`, JSON.stringify(record));
 
