@@ -6,8 +6,29 @@ export default async (req) => {
   const s = store();
 
   if (req.method === "GET") {
-    const metaRaw = await s.get("meta.json");
-    const meta = metaRaw ? JSON.parse(metaRaw) : [];
+    const { blobs } = await s.list({ prefix: "meta:" });
+    const items = await Promise.all(
+      blobs.map(async (b) => {
+        const raw = await s.get(b.key);
+        return raw ? JSON.parse(raw) : null;
+      })
+    );
+    let meta = items.filter(Boolean);
+
+    // Backward compatibility: merge in anything still sitting in the old
+    // single-file list from before this fix, in case it wasn't migrated yet.
+    const oldRaw = await s.get("meta.json");
+    if (oldRaw) {
+      const old = JSON.parse(oldRaw);
+      const knownIds = new Set(meta.map((m) => m.id));
+      for (const record of old) {
+        if (!knownIds.has(record.id)) {
+          meta.push(record);
+          knownIds.add(record.id);
+        }
+      }
+    }
+
     return new Response(JSON.stringify(meta), {
       headers: { "content-type": "application/json" }
     });
@@ -24,14 +45,12 @@ export default async (req) => {
     const bytes = Buffer.from(imageBase64, "base64");
     await s.set(`img:${id}`, bytes, { metadata: { mimeType: mimeType || "image/jpeg" } });
 
-    const metaRaw = await s.get("meta.json");
-    const meta = metaRaw ? JSON.parse(metaRaw) : [];
-    meta.push({
+    const record = {
       id,
       date: date || new Date().toISOString().slice(0, 10),
       caption: caption || ""
-    });
-    await s.set("meta.json", JSON.stringify(meta));
+    };
+    await s.set(`meta:${id}`, JSON.stringify(record));
 
     return new Response(JSON.stringify({ ok: true, id }), {
       headers: { "content-type": "application/json" }
@@ -41,10 +60,7 @@ export default async (req) => {
   if (req.method === "DELETE") {
     const { id } = await req.json();
     await s.delete(`img:${id}`);
-    const metaRaw = await s.get("meta.json");
-    let meta = metaRaw ? JSON.parse(metaRaw) : [];
-    meta = meta.filter((m) => m.id !== id);
-    await s.set("meta.json", JSON.stringify(meta));
+    await s.delete(`meta:${id}`);
     return new Response(JSON.stringify({ ok: true }), {
       headers: { "content-type": "application/json" }
     });
