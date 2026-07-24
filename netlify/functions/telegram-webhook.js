@@ -69,11 +69,7 @@ export default async (req) => {
   const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   const s = getStore("memories");
   await s.set(`img:${id}`, buf, { metadata: { mimeType: "image/jpeg" } });
-
-  const metaRaw = await s.get("meta.json");
-  const meta = metaRaw ? JSON.parse(metaRaw) : [];
-  meta.push({ id, date, caption });
-  await s.set("meta.json", JSON.stringify(meta));
+  await s.set(`meta:${id}`, JSON.stringify({ id, date, caption }));
 
   await sendMessage(msg.chat.id, `Сохранено ✅ дата: ${date}${caption ? "\nподпись: " + caption : ""}`);
 
