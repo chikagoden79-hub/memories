@@ -6,6 +6,7 @@
 <title>Воспоминания</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;1,600&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
   :root{
     --bg: #f4ecd8;
@@ -229,9 +230,77 @@
   .year-bar-track{ flex:1; height:8px; background:#efe4c4; border-radius:999px; overflow:hidden; }
   .year-bar-fill{ height:100%; background:var(--gold); border-radius:999px; }
   .year-count{ width:32px; text-align:right; color:var(--ink-soft); font-size:0.9rem; }
+  .pin-gate{
+    position:fixed; inset:0; z-index:100;
+    display:flex; align-items:center; justify-content:center;
+    background: var(--bg);
+    padding:20px;
+  }
+  .pin-gate-card{
+    background:var(--card);
+    border-radius:16px;
+    padding:36px 30px;
+    box-shadow:var(--shadow);
+    text-align:center;
+    max-width:320px;
+    width:100%;
+  }
+  #pinInput{
+    width:100%;
+    text-align:center;
+    font-size:1.6rem;
+    letter-spacing:0.5em;
+    padding:12px;
+    border-radius:8px;
+    border:1.5px solid #dccba0;
+    background:#fffefb;
+  }
+
+  .video-thumb-wrap{ position:relative; }
+  .video-thumb-wrap video{
+    width:100%; aspect-ratio:1/1; object-fit:cover; border-radius:2px; background:#000; display:block;
+  }
+  .video-thumb-wrap .play-icon{
+    position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+    font-size:1.8rem; color:#fff; text-shadow:0 2px 8px rgba(0,0,0,0.7); pointer-events:none;
+  }
+
+  .on-this-day{
+    background:var(--card);
+    border-radius:14px;
+    padding:18px 20px;
+    margin-bottom:20px;
+    box-shadow:var(--shadow);
+  }
+  .on-this-day-row{
+    display:flex; gap:12px; overflow-x:auto; padding-bottom:4px;
+  }
+  .on-this-day-item{
+    flex-shrink:0; width:90px; text-align:center; cursor:pointer;
+  }
+  .on-this-day-item img, .on-this-day-item video{
+    width:90px; height:90px; object-fit:cover; border-radius:8px; display:block; background:#e4d9c2;
+  }
+  .otd-year{
+    font-size:0.75rem; color:var(--ink-soft); margin-top:5px; font-weight:600;
+  }
 </style>
 </head>
 <body>
+
+<div id="pinGate" class="pin-gate">
+  <div class="pin-gate-card">
+    <h1 style="font-family:'Playfair Display', serif; color:var(--wine-dark); margin:0 0 6px;">Воспоминания ❤️</h1>
+    <p style="color:var(--ink-soft); margin:0 0 20px;">Введи код доступа</p>
+    <form id="pinForm">
+      <input type="text" id="pinInput" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="••••" autocomplete="off">
+      <button type="submit" class="submit-btn" style="margin-top:14px;">Войти</button>
+      <p id="pinError" style="display:none; color:var(--wine); font-size:0.85rem; margin-top:12px;">Неверный код, попробуй ещё раз.</p>
+    </form>
+  </div>
+</div>
+
+<div id="appRoot" style="display:none;">
 
 <header>
   <h1>Воспоминания</h1>
@@ -247,6 +316,7 @@
 
 <main>
   <section id="gallery" class="tab active">
+    <div id="onThisDay" class="on-this-day" style="display:none;"></div>
     <div class="gallery-filters">
       <select id="sortSelect">
         <option value="desc">Сначала новые</option>
@@ -268,9 +338,9 @@
     <div class="form-card" style="max-width:640px;">
       <h2>Новые воспоминания</h2>
 
-      <label for="photoInput">Фото (можно выбрать сразу несколько)</label>
-      <input type="file" id="photoInput" accept="image/*" multiple>
-      <p class="form-note">У каждого фото ниже можно задать свою дату и подпись.</p>
+      <label for="photoInput">Фото или видео (можно выбрать сразу несколько)</label>
+      <input type="file" id="photoInput" accept="image/*,video/*" multiple>
+      <p class="form-note">У каждого фото/видео ниже можно задать свою дату и подпись. Видео через сайт лучше грузить небольшие (до ~4 МБ) — для больших удобнее слать через телеграм-бота.</p>
 
       <div id="itemsList"></div>
 
@@ -306,6 +376,10 @@
   </section>
 
   <section id="stats" class="tab">
+    <div style="text-align:center; margin-bottom:24px;">
+      <button class="btn primary" id="exportPdfBtn">📄 Скачать альбом в PDF</button>
+      <p class="form-note" id="pdfProgress" style="display:none;"></p>
+    </div>
     <div id="statsContent"></div>
   </section>
 </main>
@@ -319,9 +393,50 @@
 
 <footer>Твои воспоминания, твой альбом.</footer>
 
+</div>
+
 <script>
 const API = '/api/memories';
 let memories = [];
+let sitePin = localStorage.getItem('sitePin') || '';
+
+function apiHeaders(){
+  return sitePin ? { 'x-site-pin': sitePin } : {};
+}
+function mediaSrc(id){
+  return `/api/image?id=${id}${sitePin ? '&pin=' + encodeURIComponent(sitePin) : ''}`;
+}
+
+async function tryUnlock(pin){
+  try{
+    const res = await fetch(API, { headers: { 'x-site-pin': pin } });
+    if(res.ok){
+      memories = await res.json();
+      sitePin = pin;
+      localStorage.setItem('sitePin', pin);
+      return true;
+    }
+    return false;
+  }catch(e){
+    return false;
+  }
+}
+
+document.getElementById('pinForm').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const val = document.getElementById('pinInput').value.trim();
+  const errEl = document.getElementById('pinError');
+  errEl.style.display = 'none';
+  const ok = await tryUnlock(val);
+  if(ok){
+    document.getElementById('pinGate').style.display = 'none';
+    document.getElementById('appRoot').style.display = '';
+    renderGallery();
+  }else{
+    errEl.style.display = 'block';
+    document.getElementById('pinInput').value = '';
+  }
+});
 
 // ---- tabs ----
 document.querySelectorAll('.tab-btn').forEach(btn=>{
@@ -364,7 +479,7 @@ function escapeHtml(str){
 async function loadMemories(){
   document.getElementById('loading').style.display = 'block';
   try{
-    const res = await fetch(API);
+    const res = await fetch(API, { headers: apiHeaders() });
     memories = await res.json();
   }catch(e){
     memories = [];
@@ -402,6 +517,48 @@ function resizeToDataUrl(file){
   });
 }
 
+function videoThumb(file){
+  return new Promise((resolve)=>{
+    const url = URL.createObjectURL(file);
+    const video = document.createElement('video');
+    video.src = url;
+    video.muted = true;
+    video.playsInline = true;
+    video.addEventListener('loadeddata', ()=>{
+      try{ video.currentTime = Math.min(0.5, (video.duration || 1) / 2); }
+      catch(e){ URL.revokeObjectURL(url); resolve(''); }
+    });
+    video.addEventListener('seeked', ()=>{
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth || 320;
+      canvas.height = video.videoHeight || 240;
+      canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      resolve(canvas.toDataURL('image/jpeg', 0.7));
+    });
+    video.addEventListener('error', ()=>{ URL.revokeObjectURL(url); resolve(''); });
+  });
+}
+
+function arrayBufferToBase64(buffer){
+  let binary = '';
+  const bytes = new Uint8Array(buffer);
+  const chunkSize = 0x8000;
+  for(let i = 0; i < bytes.length; i += chunkSize){
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+  }
+  return btoa(binary);
+}
+
+async function prepareUploadPayload(file){
+  if(file.type.startsWith('video/')){
+    const buf = await file.arrayBuffer();
+    return { base64: arrayBufferToBase64(buf), mimeType: file.type || 'video/mp4' };
+  }
+  const dataUrl = await resizeToDataUrl(file);
+  return { base64: dataUrl.split(',')[1], mimeType: 'image/jpeg' };
+}
+
 function renderItemsList(){
   const list = document.getElementById('itemsList');
   const saveBtn = document.getElementById('saveBtn');
@@ -437,16 +594,23 @@ function renderItemsList(){
 document.getElementById('photoInput').addEventListener('change', (e)=>{
   const files = Array.from(e.target.files || []);
   const defaultDate = localDateStr();
-  files.forEach(file=>{
-    const reader = new FileReader();
+  files.forEach(async file=>{
     const id = Date.now().toString(36) + Math.random().toString(36).slice(2,7);
-    const item = { id, file, thumbUrl: '', date: defaultDate, caption: '' };
+    const isVideo = file.type.startsWith('video/');
+    const item = { id, file, thumbUrl: '', date: defaultDate, caption: '', isVideo };
     items.push(item);
-    reader.onload = ()=>{
-      item.thumbUrl = reader.result;
+
+    if(isVideo){
+      item.thumbUrl = await videoThumb(file);
       renderItemsList();
-    };
-    reader.readAsDataURL(file);
+    }else{
+      const reader = new FileReader();
+      reader.onload = ()=>{
+        item.thumbUrl = reader.result;
+        renderItemsList();
+      };
+      reader.readAsDataURL(file);
+    }
   });
   e.target.value = '';
 });
@@ -467,12 +631,11 @@ document.getElementById('saveBtn').addEventListener('click', async ()=>{
     btn.textContent = `Сохраняю ${i+1} из ${total}…`;
     progressNote.textContent = `Сохранено: ${success}, ошибок: ${failed}`;
     try{
-      const dataUrl = await resizeToDataUrl(item.file);
-      const base64 = dataUrl.split(',')[1];
+      const { base64, mimeType } = await prepareUploadPayload(item.file);
       const res = await fetch(API, {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ date: item.date || localDateStr(), caption: item.caption.trim(), imageBase64: base64, mimeType: 'image/jpeg' })
+        headers: { 'content-type': 'application/json', ...apiHeaders() },
+        body: JSON.stringify({ date: item.date || localDateStr(), caption: item.caption.trim(), imageBase64: base64, mimeType })
       });
       if(res.ok) success++; else failed++;
     }catch(e){
@@ -557,14 +720,50 @@ function renderGallery(){
   sorted.forEach(m=>{
     const card = document.createElement('div');
     card.className = 'polaroid';
+    const mediaTag = m.type === 'video'
+      ? `<div class="video-thumb-wrap"><video src="${mediaSrc(m.id)}" preload="metadata" muted></video><span class="play-icon">▶</span></div>`
+      : `<img src="${mediaSrc(m.id)}" alt="воспоминание" loading="lazy">`;
     card.innerHTML = `
       <div class="tape"></div>
-      <img src="/api/image?id=${m.id}" alt="воспоминание" loading="lazy">
+      ${mediaTag}
       <div class="date">${formatDateRu(m.date)}</div>
       <div class="caption">${escapeHtml(m.caption || '')}</div>
     `;
     card.addEventListener('click', ()=> openModal(m.id));
     grid.appendChild(card);
+  });
+
+  renderOnThisDay();
+}
+
+function renderOnThisDay(){
+  const container = document.getElementById('onThisDay');
+  const today = localDateStr();
+  const todayMD = today.slice(5);
+  const matches = memories.filter(m => m.date.slice(5) === todayMD && m.date !== today);
+
+  if(matches.length === 0){
+    container.style.display = 'none';
+    container.innerHTML = '';
+    return;
+  }
+
+  const sortedMatches = [...matches].sort((a,b)=> b.date.localeCompare(a.date));
+  container.style.display = 'block';
+  container.innerHTML = `
+    <h2 class="stats-subtitle" style="margin-bottom:12px;">Этот день в истории</h2>
+    <div class="on-this-day-row">
+      ${sortedMatches.map(m=>{
+        const year = m.date.slice(0,4);
+        const tag = m.type === 'video'
+          ? `<video src="${mediaSrc(m.id)}" muted preload="metadata"></video>`
+          : `<img src="${mediaSrc(m.id)}" alt="воспоминание">`;
+        return `<div class="on-this-day-item" data-id="${m.id}">${tag}<div class="otd-year">${year}</div></div>`;
+      }).join('')}
+    </div>
+  `;
+  container.querySelectorAll('.on-this-day-item').forEach(el=>{
+    el.addEventListener('click', ()=> openModal(el.dataset.id));
   });
 }
 
@@ -572,8 +771,11 @@ function renderGallery(){
 function openModal(id){
   const m = memories.find(x=>x.id===id);
   if(!m) return;
+  const mediaTag = m.type === 'video'
+    ? `<video src="${mediaSrc(m.id)}" controls style="width:100%; border-radius:4px; display:block;"></video>`
+    : `<img src="${mediaSrc(m.id)}" alt="воспоминание">`;
   document.getElementById('modalContent').innerHTML = `
-    <img src="/api/image?id=${m.id}" alt="воспоминание">
+    ${mediaTag}
     <div class="date">${formatDateRu(m.date)}</div>
     <div class="caption">${escapeHtml(m.caption || '')}</div>
     <button class="modal-delete" id="deleteBtn">Удалить это воспоминание</button>
@@ -582,7 +784,7 @@ function openModal(id){
     if(confirm('Удалить это воспоминание насовсем?')){
       await fetch(API, {
         method: 'DELETE',
-        headers: { 'content-type': 'application/json' },
+        headers: { 'content-type': 'application/json', ...apiHeaders() },
         body: JSON.stringify({ id })
       });
       closeModal();
@@ -605,9 +807,12 @@ function showRandom(){
     return;
   }
   const m = memories[Math.floor(Math.random()*memories.length)];
+  const mediaTag = m.type === 'video'
+    ? `<video src="${mediaSrc(m.id)}" muted preload="metadata" style="cursor:pointer; width:100%; aspect-ratio:1/1; object-fit:cover; border-radius:3px;" id="randomImg"></video>`
+    : `<img src="${mediaSrc(m.id)}" alt="воспоминание" style="cursor:pointer;" id="randomImg">`;
   wrap.innerHTML = `
     <div class="random-card">
-      <img src="/api/image?id=${m.id}" alt="воспоминание" style="cursor:pointer;" id="randomImg">
+      ${mediaTag}
       <div class="date">${formatDateRu(m.date)}</div>
       <div class="caption">${escapeHtml(m.caption || '')}</div>
     </div>
@@ -785,8 +990,87 @@ function renderStats(){
   });
 }
 
+// ---- PDF export ----
+async function fetchAsDataUrl(url){
+  const res = await fetch(url);
+  const blob = await res.blob();
+  return new Promise((resolve, reject)=>{
+    const reader = new FileReader();
+    reader.onload = ()=> resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function exportPdf(){
+  if(memories.length === 0){
+    alert('Пока нечего сохранять — альбом пуст.');
+    return;
+  }
+  const btn = document.getElementById('exportPdfBtn');
+  const note = document.getElementById('pdfProgress');
+  btn.disabled = true;
+  note.style.display = 'block';
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const sorted = [...memories].sort((a,b)=> a.date.localeCompare(b.date));
+
+  for(let i = 0; i < sorted.length; i++){
+    const m = sorted[i];
+    note.textContent = `Готовлю страницу ${i+1} из ${sorted.length}…`;
+    if(i > 0) doc.addPage();
+
+    doc.setFontSize(11);
+    doc.setTextColor(90, 60, 30);
+    doc.text(formatDateRu(m.date), 15, 20);
+
+    if(m.type === 'video'){
+      doc.setFontSize(14);
+      doc.text('🎥 Видео — воспроизведение доступно только на сайте', 15, 45);
+      if(m.caption){
+        doc.setFontSize(10);
+        doc.text(doc.splitTextToSize(m.caption, 180), 15, 58);
+      }
+      continue;
+    }
+
+    try{
+      const dataUrl = await fetchAsDataUrl(mediaSrc(m.id));
+      const imgProps = doc.getImageProperties(dataUrl);
+      const maxW = 180, maxH = 220;
+      let w = imgProps.width, h = imgProps.height;
+      const scale = Math.min(maxW / w, maxH / h);
+      w *= scale; h *= scale;
+      doc.addImage(dataUrl, 'JPEG', 15, 28, w, h);
+      if(m.caption){
+        doc.setFontSize(10);
+        doc.text(doc.splitTextToSize(m.caption, 180), 15, 28 + h + 8);
+      }
+    }catch(e){
+      doc.setFontSize(10);
+      doc.text('Не удалось загрузить фото для PDF.', 15, 40);
+    }
+  }
+
+  doc.save('воспоминания.pdf');
+  btn.disabled = false;
+  note.style.display = 'none';
+}
+document.getElementById('exportPdfBtn').addEventListener('click', exportPdf);
+
 // ---- init ----
-loadMemories();
+(async ()=>{
+  const ok = await tryUnlock(sitePin);
+  if(ok){
+    document.getElementById('pinGate').style.display = 'none';
+    document.getElementById('appRoot').style.display = '';
+    renderGallery();
+  }else{
+    document.getElementById('pinGate').style.display = 'flex';
+    document.getElementById('appRoot').style.display = 'none';
+  }
+})();
 </script>
 </body>
 </html>
