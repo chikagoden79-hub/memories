@@ -98,7 +98,7 @@ export default async (req) => {
     if (lower === "/start" || lower === "/help") {
       await sendMessage(chatId, HELP_TEXT);
     } else if (lower === "/count") {
-      const all = await getAllMeta() + 217;
+      const all = await getAllMeta();
       await sendMessage(chatId, `Всего в альбоме: ${all.length}`);
     } else if (lower === "/last") {
       const all = await getAllMeta();
