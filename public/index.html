@@ -89,6 +89,23 @@
   .submit-btn:disabled{ opacity:0.6; cursor:default; }
   .form-note{ font-size:0.8rem; color:var(--ink-soft); margin-top:10px; }
 
+  .upload-item{
+    display:flex; gap:14px; align-items:flex-start;
+    border-top:1px solid #e9ddbb; padding:16px 0;
+  }
+  .upload-item-thumb{
+    width:84px; height:84px; object-fit:cover; border-radius:6px; flex-shrink:0; background:#e4d9c2;
+  }
+  .upload-item-fields{ flex:1; min-width:0; }
+  .upload-item-fields label{ margin:0 0 4px; font-size:0.72rem; }
+  .upload-item-fields input[type=date]{ margin-bottom:0; }
+  .upload-item-fields textarea{ min-height:44px; margin-top:10px; }
+  .upload-item-fields .date-row{ margin-top:6px; margin-bottom:0; }
+  .item-remove{
+    margin-top:10px; background:none; border:none; color:var(--wine); font-size:0.78rem;
+    text-decoration:underline; cursor:pointer; padding:0;
+  }
+
   .random-wrap{ text-align:center; padding:20px 0; }
   .random-card{ max-width:420px; margin:0 auto; background:var(--card); border-radius:6px; padding:16px 16px 22px; box-shadow:var(--shadow); }
   .random-card img{ width:100%; border-radius:3px; aspect-ratio: 1/1; object-fit:cover; background:#e4d9c2; }
@@ -110,6 +127,82 @@
 
   footer{ text-align:center; padding:20px; font-size:0.78rem; color:var(--ink-soft); }
   .loading{ text-align:center; color:var(--ink-soft); font-style:italic; padding:30px; }
+
+  .stats-grid{
+    display:grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap:16px;
+    margin-bottom:30px;
+  }
+  .stat-card{
+    background:var(--card);
+    border-radius:12px;
+    padding:20px 16px;
+    box-shadow:var(--shadow);
+    text-align:center;
+  }
+  .stat-card .value{
+    font-family:'Playfair Display', serif;
+    font-weight:700;
+    font-size:1.5rem;
+    color:var(--wine-dark);
+    line-height:1.2;
+  }
+  .stat-card .label{
+    font-size:0.76rem;
+    color:var(--ink-soft);
+    margin-top:6px;
+    line-height:1.3;
+  }
+  .stats-subtitle{
+    font-family:'Playfair Display', serif;
+    color:var(--wine-dark);
+    margin:0 0 14px;
+  }
+  .emoji-list{
+    background:var(--card);
+    border-radius:12px;
+    padding:8px 22px;
+    box-shadow:var(--shadow);
+  }
+  .emoji-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:11px 0;
+    border-bottom:1px solid #efe4c4;
+    font-size:1.05rem;
+  }
+  .emoji-row:last-child{ border-bottom:none; }
+  .emoji-rank{ color:var(--ink-soft); font-size:0.8rem; margin-right:8px; }
+  .emoji-count{ color:var(--ink-soft); font-size:0.9rem; }
+
+  .milestone-banner{
+    background: linear-gradient(120deg, #f6dfa0, #f0c869);
+    color:var(--wine-dark);
+    font-weight:600;
+    padding:16px 20px;
+    border-radius:12px;
+    margin-bottom:26px;
+    box-shadow:var(--shadow);
+    line-height:1.4;
+  }
+  .callout-card{
+    background:var(--card);
+    border-radius:12px;
+    padding:18px 20px;
+    box-shadow:var(--shadow);
+    margin-bottom:30px;
+  }
+  .year-list{ padding:16px 22px; }
+  .year-row{
+    display:flex; align-items:center; gap:12px;
+    padding:8px 0;
+  }
+  .year-label{ width:48px; font-weight:600; color:var(--wine-dark); font-family:'Playfair Display', serif; }
+  .year-bar-track{ flex:1; height:8px; background:#efe4c4; border-radius:999px; overflow:hidden; }
+  .year-bar-fill{ height:100%; background:var(--gold); border-radius:999px; }
+  .year-count{ width:32px; text-align:right; color:var(--ink-soft); font-size:0.9rem; }
 </style>
 </head>
 <body>
@@ -123,6 +216,7 @@
   <button class="tab-btn active" data-tab="gallery">Галерея</button>
   <button class="tab-btn" data-tab="add">Добавить</button>
   <button class="tab-btn" data-tab="random">Случайное воспоминание</button>
+  <button class="tab-btn" data-tab="stats">Статистика</button>
 </nav>
 
 <main>
@@ -135,27 +229,36 @@
   </section>
 
   <section id="add" class="tab">
-    <div class="form-card">
-      <h2>Новое воспоминание</h2>
+    <div class="form-card" style="max-width:640px;">
+      <h2>Новые воспоминания</h2>
 
-      <label for="photoInput">Фото</label>
-      <input type="file" id="photoInput" accept="image/*">
-      <img id="preview" alt="превью">
+      <label for="photoInput">Фото (можно выбрать сразу несколько)</label>
+      <input type="file" id="photoInput" accept="image/*" multiple>
+      <p class="form-note">У каждого фото ниже можно задать свою дату и подпись.</p>
 
-      <label for="dateInput">Дата</label>
-      <input type="date" id="dateInput">
-      <div class="date-row">
-        <span class="chip" id="btnTodayLocal">Сегодня (по времени телефона)</span>
-        <span class="chip" id="btnTodayMsk">Сегодня (МСК)</span>
-      </div>
+      <div id="itemsList"></div>
 
-      <label for="captionInput">Подпись</label>
-      <textarea id="captionInput" placeholder="Пара слов об этом моменте..."></textarea>
-
-      <button class="submit-btn" id="saveBtn">Сохранить воспоминание</button>
-      <p class="form-note">Фото сохраняется на сервере и видно с любого устройства.</p>
+      <button class="submit-btn" id="saveBtn" style="display:none;">Сохранить все</button>
+      <p class="form-note" id="progressNote" style="display:none;"></p>
     </div>
   </section>
+
+  <template id="itemTemplate">
+    <div class="upload-item">
+      <img class="upload-item-thumb" alt="превью">
+      <div class="upload-item-fields">
+        <label>Дата</label>
+        <input type="date" class="item-date">
+        <div class="date-row">
+          <span class="chip item-today-local">По телефону</span>
+          <span class="chip item-today-msk">МСК</span>
+        </div>
+        <label>Подпись</label>
+        <textarea class="item-caption" placeholder="Пара слов об этом моменте..."></textarea>
+        <button class="item-remove" type="button">Убрать</button>
+      </div>
+    </div>
+  </template>
 
   <section id="random" class="tab">
     <div class="random-wrap">
@@ -164,6 +267,10 @@
         <button class="btn primary" id="randomAgain">Ещё одно воспоминание</button>
       </div>
     </div>
+  </section>
+
+  <section id="stats" class="tab">
+    <div id="statsContent"></div>
   </section>
 </main>
 
@@ -188,6 +295,7 @@ document.querySelectorAll('.tab-btn').forEach(btn=>{
     btn.classList.add('active');
     document.getElementById(btn.dataset.tab).classList.add('active');
     if(btn.dataset.tab === 'random') showRandom();
+    if(btn.dataset.tab === 'stats') renderStats();
   });
 });
 
@@ -204,12 +312,6 @@ function mskDateStr(){
   const msk = new Date(utcMs + 3*3600000);
   return msk.toISOString().slice(0,10);
 }
-document.getElementById('btnTodayLocal').addEventListener('click', ()=>{
-  document.getElementById('dateInput').value = localDateStr();
-});
-document.getElementById('btnTodayMsk').addEventListener('click', ()=>{
-  document.getElementById('dateInput').value = mskDateStr();
-});
 
 function formatDateRu(dateStr){
   const months = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
@@ -235,69 +337,123 @@ async function loadMemories(){
   renderGallery();
 }
 
-// ---- image handling for upload ----
-let pendingDataUrl = null;
-document.getElementById('photoInput').addEventListener('change', (e)=>{
-  const file = e.target.files[0];
-  if(!file) return;
-  const reader = new FileReader();
-  reader.onload = ()=>{
-    const img = new Image();
-    img.onload = ()=>{
-      const maxDim = 1400;
-      let {width, height} = img;
-      if(width > maxDim || height > maxDim){
-        const scale = maxDim / Math.max(width, height);
-        width = Math.round(width*scale);
-        height = Math.round(height*scale);
-      }
-      const canvas = document.createElement('canvas');
-      canvas.width = width; canvas.height = height;
-      canvas.getContext('2d').drawImage(img, 0, 0, width, height);
-      pendingDataUrl = canvas.toDataURL('image/jpeg', 0.82);
-      const preview = document.getElementById('preview');
-      preview.src = pendingDataUrl;
-      preview.style.display = 'block';
+// ---- per-photo upload items ----
+let items = []; // { id, file, thumbUrl }
+
+function resizeToDataUrl(file){
+  return new Promise((resolve, reject)=>{
+    const reader = new FileReader();
+    reader.onload = ()=>{
+      const img = new Image();
+      img.onload = ()=>{
+        const maxDim = 1400;
+        let {width, height} = img;
+        if(width > maxDim || height > maxDim){
+          const scale = maxDim / Math.max(width, height);
+          width = Math.round(width*scale);
+          height = Math.round(height*scale);
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width; canvas.height = height;
+        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', 0.82));
+      };
+      img.onerror = reject;
+      img.src = reader.result;
     };
-    img.src = reader.result;
-  };
-  reader.readAsDataURL(file);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function renderItemsList(){
+  const list = document.getElementById('itemsList');
+  const saveBtn = document.getElementById('saveBtn');
+  list.innerHTML = '';
+  items.forEach(item=>{
+    const tpl = document.getElementById('itemTemplate').content.cloneNode(true);
+    const root = tpl.querySelector('.upload-item');
+    const thumb = tpl.querySelector('.upload-item-thumb');
+    const dateInput = tpl.querySelector('.item-date');
+    const captionInput = tpl.querySelector('.item-caption');
+    const btnLocal = tpl.querySelector('.item-today-local');
+    const btnMsk = tpl.querySelector('.item-today-msk');
+    const removeBtn = tpl.querySelector('.item-remove');
+
+    thumb.src = item.thumbUrl;
+    dateInput.value = item.date;
+    captionInput.value = item.caption;
+
+    dateInput.addEventListener('change', ()=>{ item.date = dateInput.value; });
+    captionInput.addEventListener('input', ()=>{ item.caption = captionInput.value; });
+    btnLocal.addEventListener('click', ()=>{ dateInput.value = localDateStr(); item.date = dateInput.value; });
+    btnMsk.addEventListener('click', ()=>{ dateInput.value = mskDateStr(); item.date = dateInput.value; });
+    removeBtn.addEventListener('click', ()=>{
+      items = items.filter(x=>x.id !== item.id);
+      renderItemsList();
+    });
+
+    list.appendChild(root);
+  });
+  saveBtn.style.display = items.length > 0 ? 'block' : 'none';
+}
+
+document.getElementById('photoInput').addEventListener('change', (e)=>{
+  const files = Array.from(e.target.files || []);
+  const defaultDate = localDateStr();
+  files.forEach(file=>{
+    const reader = new FileReader();
+    const id = Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+    const item = { id, file, thumbUrl: '', date: defaultDate, caption: '' };
+    items.push(item);
+    reader.onload = ()=>{
+      item.thumbUrl = reader.result;
+      renderItemsList();
+    };
+    reader.readAsDataURL(file);
+  });
+  e.target.value = '';
 });
 
 document.getElementById('saveBtn').addEventListener('click', async ()=>{
-  const date = document.getElementById('dateInput').value || localDateStr();
-  const caption = document.getElementById('captionInput').value.trim();
-  if(!pendingDataUrl){
-    alert('Сначала выбери фото.');
-    return;
-  }
+  if(items.length === 0) return;
+
   const btn = document.getElementById('saveBtn');
+  const progressNote = document.getElementById('progressNote');
   btn.disabled = true;
-  btn.textContent = 'Сохраняю…';
+  progressNote.style.display = 'block';
 
-  const base64 = pendingDataUrl.split(',')[1];
-  try{
-    await fetch(API, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ date, caption, imageBase64: base64, mimeType: 'image/jpeg' })
-    });
-  }catch(e){
-    alert('Не получилось сохранить. Проверь подключение и попробуй снова.');
-    btn.disabled = false;
-    btn.textContent = 'Сохранить воспоминание';
-    return;
+  let success = 0, failed = 0;
+  const total = items.length;
+
+  for(let i = 0; i < total; i++){
+    const item = items[i];
+    btn.textContent = `Сохраняю ${i+1} из ${total}…`;
+    progressNote.textContent = `Сохранено: ${success}, ошибок: ${failed}`;
+    try{
+      const dataUrl = await resizeToDataUrl(item.file);
+      const base64 = dataUrl.split(',')[1];
+      const res = await fetch(API, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ date: item.date || localDateStr(), caption: item.caption.trim(), imageBase64: base64, mimeType: 'image/jpeg' })
+      });
+      if(res.ok) success++; else failed++;
+    }catch(e){
+      failed++;
+    }
   }
 
-  pendingDataUrl = null;
-  document.getElementById('photoInput').value = '';
-  document.getElementById('captionInput').value = '';
-  document.getElementById('preview').style.display = 'none';
+  progressNote.textContent = `Готово! Сохранено: ${success}, ошибок: ${failed}`;
   btn.disabled = false;
-  btn.textContent = 'Сохранить воспоминание';
+  btn.textContent = 'Сохранить все';
 
+  items = [];
+  renderItemsList();
   await loadMemories();
-  document.querySelector('.tab-btn[data-tab="gallery"]').click();
+  if(failed === 0){
+    document.querySelector('.tab-btn[data-tab="gallery"]').click();
+  }
 });
 
 // ---- gallery ----
@@ -364,16 +520,201 @@ function showRandom(){
   const m = memories[Math.floor(Math.random()*memories.length)];
   wrap.innerHTML = `
     <div class="random-card">
-      <img src="/api/image?id=${m.id}" alt="воспоминание">
+      <img src="/api/image?id=${m.id}" alt="воспоминание" style="cursor:pointer;" id="randomImg">
       <div class="date">${formatDateRu(m.date)}</div>
       <div class="caption">${escapeHtml(m.caption || '')}</div>
     </div>
   `;
+  document.getElementById('randomImg').addEventListener('click', ()=> openModal(m.id));
 }
 document.getElementById('randomAgain').addEventListener('click', showRandom);
 
+// ---- stats tab ----
+const RU_WEEKDAYS = ['Воскресенье','Понедельник','Вторник','Среда','Четверг','Пятница','Суббота'];
+const RU_MONTHS_NOM = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+
+function extractEmojis(text){
+  if(!text) return [];
+  const out = [];
+  try{
+    const seg = new Intl.Segmenter('ru', { granularity: 'grapheme' });
+    for(const { segment } of seg.segment(text)){
+      if(/\p{Extended_Pictographic}/u.test(segment)) out.push(segment);
+    }
+  }catch(e){
+    const matches = text.match(/\p{Extended_Pictographic}/gu);
+    if(matches) out.push(...matches);
+  }
+  return out;
+}
+
+function formatMonthRu(ym){
+  const [y, m] = ym.split('-').map(Number);
+  return `${RU_MONTHS_NOM[m-1]} ${y}`;
+}
+
+const STOPWORDS = new Set(['и','в','на','с','по','а','но','что','это','как','для','от','до','за','из','у','же','ли','бы','не','да','то','там','тут','его','ее','её','их','был','было','была','были','я','ты','он','она','мы','вы','они','к','о','об','при','все','всё','уже','ещё','только','очень','просто','так','вот','этот','эта','эти','мой','моя','мое','моё','твой','твоя','твое','твоё','наш','наша','наше','ваш','ваша','ваше','когда','где','кто','чем','чтобы','если','или','него','нее','неё','них','нам','вам','им','мне','тебе','ему','ей','нас','вас']);
+
+function extractWords(text){
+  if(!text) return [];
+  const matches = text.toLowerCase().match(/[a-zа-яё]+/gi) || [];
+  return matches.filter(w => w.length >= 3 && !STOPWORDS.has(w));
+}
+
+function computeStats(){
+  if(memories.length === 0) return null;
+
+  const byDate = {};
+  memories.forEach(m=>{ byDate[m.date] = (byDate[m.date]||0)+1; });
+  const busiestDateEntry = Object.entries(byDate).sort((a,b)=>b[1]-a[1])[0];
+
+  const byMonth = {};
+  memories.forEach(m=>{ const ym = m.date.slice(0,7); byMonth[ym] = (byMonth[ym]||0)+1; });
+  const busiestMonthEntry = Object.entries(byMonth).sort((a,b)=>b[1]-a[1])[0];
+
+  const byWeekday = [0,0,0,0,0,0,0];
+  memories.forEach(m=>{ byWeekday[new Date(m.date+'T00:00:00').getDay()]++; });
+  let topWeekdayIdx = 0;
+  byWeekday.forEach((v,i)=>{ if(v > byWeekday[topWeekdayIdx]) topWeekdayIdx = i; });
+
+  const uniqueDates = Object.keys(byDate).sort();
+  let bestStreak = 1, curStreak = 1, bestStart = uniqueDates[0], bestEnd = uniqueDates[0], curStart = uniqueDates[0];
+  let longestGap = { days: 0, start: null, end: null };
+  for(let i=1; i<uniqueDates.length; i++){
+    const prev = new Date(uniqueDates[i-1]+'T00:00:00');
+    const cur = new Date(uniqueDates[i]+'T00:00:00');
+    const diffDays = Math.round((cur-prev)/86400000);
+    if(diffDays === 1){ curStreak++; } else { curStreak = 1; curStart = uniqueDates[i]; }
+    if(curStreak > bestStreak){ bestStreak = curStreak; bestStart = curStart; bestEnd = uniqueDates[i]; }
+    const gapDays = diffDays - 1;
+    if(gapDays > longestGap.days){ longestGap = { days: gapDays, start: uniqueDates[i-1], end: uniqueDates[i] }; }
+  }
+
+  const emojiCounts = {};
+  const wordCounts = {};
+  let withCaption = 0;
+  let longestCaptionMemory = null;
+  memories.forEach(m=>{
+    extractEmojis(m.caption).forEach(e=>{ emojiCounts[e] = (emojiCounts[e]||0)+1; });
+    extractWords(m.caption).forEach(w=>{ wordCounts[w] = (wordCounts[w]||0)+1; });
+    if(m.caption && m.caption.trim().length > 0){
+      withCaption++;
+      if(!longestCaptionMemory || m.caption.trim().length > longestCaptionMemory.caption.trim().length){
+        longestCaptionMemory = m;
+      }
+    }
+  });
+  const topEmojis = Object.entries(emojiCounts).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  const topWords = Object.entries(wordCounts).sort((a,b)=>b[1]-a[1]).slice(0,10);
+
+  const byYear = {};
+  memories.forEach(m=>{ const y = m.date.slice(0,4); byYear[y] = (byYear[y]||0)+1; });
+  const yearBreakdown = Object.entries(byYear).sort((a,b)=>a[0].localeCompare(b[0]));
+
+  const byUploadOrder = [...memories].sort((a,b)=> a.id.localeCompare(b.id));
+  const total = memories.length;
+  const milestoneStep = 50;
+  const reached = Math.floor(total / milestoneStep) * milestoneStep;
+  let milestone = null;
+  if(reached > 0){
+    const m = byUploadOrder[reached - 1];
+    milestone = { count: reached, date: m.date, caption: m.caption, remaining: (reached + milestoneStep) - total };
+  }else{
+    milestone = { count: 0, remaining: milestoneStep - total };
+  }
+
+  return {
+    total,
+    busiestDate: { date: busiestDateEntry[0], count: busiestDateEntry[1] },
+    busiestMonth: { ym: busiestMonthEntry[0], count: busiestMonthEntry[1] },
+    topWeekday: { name: RU_WEEKDAYS[topWeekdayIdx], count: byWeekday[topWeekdayIdx] },
+    streak: { length: bestStreak, start: bestStart, end: bestEnd },
+    longestGap,
+    topEmojis,
+    topWords,
+    captionRatio: { withCaption, total, percent: Math.round((withCaption/total)*100) },
+    longestCaption: longestCaptionMemory,
+    yearBreakdown,
+    milestone,
+    firstDate: uniqueDates[0],
+    lastDate: uniqueDates[uniqueDates.length-1]
+  };
+}
+
+function renderStats(){
+  const wrap = document.getElementById('statsContent');
+  const stats = computeStats();
+
+  if(!stats){
+    wrap.innerHTML = `<div class="board"><div class="board-empty">Пока нет воспоминаний для статистики.</div></div>`;
+    return;
+  }
+
+  const emojiHtml = stats.topEmojis.length
+    ? stats.topEmojis.map((e,i)=>`
+        <div class="emoji-row">
+          <span><span class="emoji-rank">${i+1}.</span>${e[0]}</span>
+          <span class="emoji-count">${e[1]}</span>
+        </div>
+      `).join('')
+    : `<p style="color:var(--ink-soft); font-style:italic; padding:14px 0;">Пока ни один смайлик не встречался в подписях.</p>`;
+
+  const wordsHtml = stats.topWords.length
+    ? stats.topWords.map((w,i)=>`
+        <div class="emoji-row">
+          <span><span class="emoji-rank">${i+1}.</span>${escapeHtml(w[0])}</span>
+          <span class="emoji-count">${w[1]}</span>
+        </div>
+      `).join('')
+    : `<p style="color:var(--ink-soft); font-style:italic; padding:14px 0;">Пока маловато текста в подписях для топа слов.</p>`;
+
+  const yearHtml = stats.yearBreakdown.map(([year, count])=>{
+    const max = Math.max(...stats.yearBreakdown.map(y=>y[1]));
+    const widthPct = Math.round((count / max) * 100);
+    return `
+      <div class="year-row">
+        <span class="year-label">${year}</span>
+        <div class="year-bar-track"><div class="year-bar-fill" style="width:${widthPct}%;"></div></div>
+        <span class="year-count">${count}</span>
+      </div>
+    `;
+  }).join('');
+
+  const milestoneHtml = stats.milestone.count > 0
+    ? `<div class="milestone-banner">🎉 ${stats.milestone.count}-е воспоминание было добавлено ${formatDateRu(stats.milestone.date)}${stats.milestone.caption ? ' — «' + escapeHtml(stats.milestone.caption) + '»' : ''}. До следующего юбилея осталось ${stats.milestone.remaining} фото.</div>`
+    : `<div class="milestone-banner">До первого юбилея (50 воспоминаний) осталось ${stats.milestone.remaining} фото.</div>`;
+
+  const longestCaptionHtml = stats.longestCaption
+    ? `<div class="callout-card"><div class="stats-subtitle" style="margin-bottom:8px;">Самая длинная подпись</div><p style="color:var(--ink); line-height:1.5;">«${escapeHtml(stats.longestCaption.caption.trim())}»</p><p style="color:var(--ink-soft); font-size:0.85rem; margin-top:6px;">${formatDateRu(stats.longestCaption.date)}</p></div>`
+    : '';
+
+  wrap.innerHTML = `
+    ${milestoneHtml}
+    <div class="stats-grid">
+      <div class="stat-card"><div class="value">${stats.total}</div><div class="label">воспоминаний всего</div></div>
+      <div class="stat-card"><div class="value">${stats.busiestDate.count}</div><div class="label">фото ${formatDateRu(stats.busiestDate.date)} — самый насыщенный день</div></div>
+      <div class="stat-card"><div class="value">${stats.busiestMonth.count}</div><div class="label">фото за ${formatMonthRu(stats.busiestMonth.ym)} — самый активный месяц</div></div>
+      <div class="stat-card"><div class="value">${stats.topWeekday.name}</div><div class="label">самый частый день недели (${stats.topWeekday.count} фото)</div></div>
+      <div class="stat-card"><div class="value">${stats.streak.length} ${stats.streak.length===1?'день':'дня/дней'}</div><div class="label">самая долгая серия подряд${stats.streak.length>1 ? ` (${formatDateRu(stats.streak.start)} — ${formatDateRu(stats.streak.end)})` : ''}</div></div>
+      <div class="stat-card"><div class="value">${stats.longestGap.days} ${stats.longestGap.days===1?'день':'дней'}</div><div class="label">самый долгий перерыв${stats.longestGap.start ? ` (между ${formatDateRu(stats.longestGap.start)} и ${formatDateRu(stats.longestGap.end)})` : ''}</div></div>
+      <div class="stat-card"><div class="value">${stats.captionRatio.percent}%</div><div class="label">фото с подписью (${stats.captionRatio.withCaption} из ${stats.captionRatio.total})</div></div>
+      <div class="stat-card"><div class="value">${formatDateRu(stats.firstDate)}</div><div class="label">дата первого воспоминания</div></div>
+    </div>
+
+    ${longestCaptionHtml}
+
+    <h2 class="stats-subtitle">По годам</h2>
+    <div class="emoji-list year-list">${yearHtml}</div>
+
+    <h2 class="stats-subtitle">Топ-10 смайликов в подписях</h2>
+    <div class="emoji-list">${emojiHtml}</div>
+
+    <h2 class="stats-subtitle">Топ-10 слов в подписях</h2>
+    <div class="emoji-list">${wordsHtml}</div>
+  `;
+}
+
 // ---- init ----
-document.getElementById('dateInput').value = localDateStr();
 loadMemories();
 </script>
 </body>
