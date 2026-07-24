@@ -5,6 +5,11 @@ export default async (req) => {
   const id = url.searchParams.get("id");
   if (!id) return new Response("Missing id", { status: 400 });
 
+  const expected = process.env.SITE_PIN;
+  if (expected && url.searchParams.get("pin") !== expected) {
+    return new Response("Unauthorized", { status: 401 });
+  }
+
   const s = getStore("memories");
   const entry = await s.getWithMetadata(`img:${id}`, { type: "arrayBuffer" });
   if (!entry) return new Response("Not found", { status: 404 });
@@ -12,7 +17,7 @@ export default async (req) => {
   return new Response(entry.data, {
     headers: {
       "content-type": entry.metadata?.mimeType || "image/jpeg",
-      "cache-control": "public, max-age=31536000, immutable"
+      "cache-control": "private, max-age=31536000, immutable"
     }
   });
 };
